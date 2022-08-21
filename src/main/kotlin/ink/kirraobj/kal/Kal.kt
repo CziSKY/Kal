@@ -6,14 +6,16 @@ object Kal {
 
     @JvmStatic
     fun main(args: Array<String>) {
-//        val expr = mkMultiply(mkPlus(mkLit(1), mkLit(2)), mkPlus(mkLit(3), mkLit(4)))
-//        println(Plus(mkLit(2), mkLit(0)).simp())
         println(Multiply(mkLit(2), mkLit(0)).simp())
-//        println(expr.toString())
-//        println(expr.eval(mutableMapOf()))
     }
 
     abstract class Expr {
+
+        abstract fun again(loc: Map<String, Int>): (IntArray) -> (Int)
+
+        abstract fun yolo(loc: Map<String, Int>, env: Array<Int>): Int
+
+        abstract fun locate(loc: MutableMap<String, Int>)
 
         abstract fun eval(vars: Map<String, Int>): Int
 
@@ -22,6 +24,22 @@ object Kal {
 
     data class Var(val name: String) : Expr() {
 
+        override fun again(loc: Map<String, Int>): (IntArray) -> Int {
+            val index = loc[name]!!
+            return { env -> env[index] }
+        }
+
+        override fun yolo(loc: Map<String, Int>, env: Array<Int>): Int {
+            val index = loc[name]!!
+            return env[index]
+        }
+
+        override fun locate(loc: MutableMap<String, Int>) {
+            if (loc.containsKey(name)) {
+                loc[name] = loc.size
+            }
+        }
+
         override fun eval(vars: Map<String, Int>): Int {
             return vars[name]!!
         }
@@ -29,12 +47,35 @@ object Kal {
 
     data class Lit(val value: Int) : Expr() {
 
+        override fun again(loc: Map<String, Int>): (IntArray) -> Int = {
+            value
+        }
+
+        override fun yolo(loc: Map<String, Int>, env: Array<Int>): Int {
+            return value
+        }
+
+        override fun locate(loc: MutableMap<String, Int>) {}
+
         override fun eval(vars: Map<String, Int>) = value
 
         override fun toString() = value.toString()
     }
 
     data class Plus(val left: Expr, val right: Expr) : Expr() {
+
+        override fun again(loc: Map<String, Int>): (IntArray) -> Int {
+            return { env -> left.again(loc).invoke(env) + right.again(loc).invoke(env) }
+        }
+
+        override fun yolo(loc: Map<String, Int>, env: Array<Int>): Int {
+            return left.yolo(loc, env) + right.yolo(loc, env)
+        }
+
+        override fun locate(loc: MutableMap<String, Int>) {
+            left.locate(loc)
+            right.locate(loc)
+        }
 
         override fun eval(vars: Map<String, Int>) = left.eval(vars) + right.eval(vars)
 
@@ -54,6 +95,19 @@ object Kal {
 
     data class Multiply(val left: Expr, val right: Expr) : Expr() {
 
+        override fun again(loc: Map<String, Int>): (IntArray) -> Int {
+            return { env -> left.again(loc).invoke(env) * right.again(loc).invoke(env) }
+        }
+
+        override fun yolo(loc: Map<String, Int>, env: Array<Int>): Int {
+            return left.yolo(loc, env) * right.yolo(loc, env)
+        }
+
+        override fun locate(loc: MutableMap<String, Int>) {
+            left.locate(loc)
+            right.locate(loc)
+        }
+
         override fun eval(vars: Map<String, Int>) = left.eval(vars) * right.eval(vars)
 
         override fun toString() = "($left * $right)"
@@ -69,6 +123,14 @@ object Kal {
                 else -> mkMultiply(left, right)
             }
         }
+    }
+
+    fun env2LocEnv(env: Map<String, Int>, loc: Map<String, Int>): Array<Int> {
+        val arr = arrayOfNulls<Int>(loc.size)
+        loc.entries.forEach {
+            arr[it.value] = env[it.key]
+        }
+        return arr.filterNotNull().toTypedArray()
     }
 
     fun mkLit(value: Int) = Lit(value) as Expr
