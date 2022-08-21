@@ -6,6 +6,7 @@ object Kal {
 
     @JvmStatic
     fun main(args: Array<String>) {
+        println(Minus(Minus(mkLit(1), mkLit(2)), Plus(mkLit(2), mkLit(3))).simp())
         println(Multiply(mkLit(2), mkLit(0)).simp())
     }
 
@@ -17,7 +18,7 @@ object Kal {
 
         abstract fun locate(loc: MutableMap<String, Int>)
 
-        abstract fun eval(vars: Map<String, Int>): Int
+        abstract fun eval(vars: Map<String, Int> = mapOf()): Int
 
         open fun simp() = this
     }
@@ -93,6 +94,35 @@ object Kal {
         }
     }
 
+    data class Minus(val left: Expr, val right: Expr) : Expr() {
+        override fun again(loc: Map<String, Int>): (IntArray) -> Int {
+            return { env -> left.again(loc).invoke(env) - right.again(loc).invoke(env) }
+        }
+
+        override fun yolo(loc: Map<String, Int>, env: Array<Int>): Int {
+            return left.yolo(loc, env) - right.yolo(loc, env)
+        }
+
+        override fun locate(loc: MutableMap<String, Int>) {
+            left.locate(loc)
+            right.locate(loc)
+        }
+
+        override fun eval(vars: Map<String, Int>) = left.eval(vars) - right.eval(vars)
+
+        override fun toString() = "($left - $right)"
+
+        override fun simp(): Expr {
+            val left = left.simp()
+            val right = right.simp()
+            return when {
+                right == mkLit(0) -> left
+                left == right -> mkLit(0)
+                else -> mkMinus(left, right)
+            }
+        }
+    }
+
     data class Multiply(val left: Expr, val right: Expr) : Expr() {
 
         override fun again(loc: Map<String, Int>): (IntArray) -> Int {
@@ -135,5 +165,6 @@ object Kal {
 
     fun mkLit(value: Int) = Lit(value) as Expr
     fun mkPlus(left: Expr, right: Expr) = Plus(left, right) as Expr
+    fun mkMinus(left: Expr, right: Expr) = Minus(left, right) as Expr
     fun mkMultiply(left: Expr, right: Expr) = Multiply(left, right) as Expr
 }
